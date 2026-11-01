@@ -27,18 +27,24 @@ logger = logging.getLogger(__name__)
 # default `ensure_ascii=True`, so those two entries do not change today's
 # output; they are kept so the table stays correct if that ever changes, since
 # both are line terminators outside a JS string literal.
-_SCRIPT_SAFE = str.maketrans({
-    "<": "\\u003c",
-    ">": "\\u003e",
-    "&": "\\u0026",
-    "\u2028": "\\u2028",
-    "\u2029": "\\u2029",
-})
+# Applied with chained `str.replace` rather than `str.translate`: translate with
+# multi-character replacements leaves CPython's ASCII fast path at the first
+# `<`, `>` or `&`, which made large reports ~10x slower to serialize (#457).
+_SCRIPT_ESCAPES = (
+    ("<", "\\u003c"),
+    (">", "\\u003e"),
+    ("&", "\\u0026"),
+    ("\u2028", "\\u2028"),
+    ("\u2029", "\\u2029"),
+)
 
 
 def _json_for_script(value: Any) -> str:
     """Serialize ``value`` as JSON that is safe to place inside ``<script>``."""
-    return json.dumps(value).translate(_SCRIPT_SAFE)
+    text = json.dumps(value)
+    for char, escaped in _SCRIPT_ESCAPES:
+        text = text.replace(char, escaped)
+    return text
 
 
 class EvaluationHTMLReporter:

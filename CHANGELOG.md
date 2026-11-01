@@ -458,6 +458,10 @@ Each release links to full notes on the
   1,000 documents, a 13.3 MB blob. Evaluation results are unaffected; this is
   report-generation time only. A faster form with byte-identical output is
   tracked in [#457](https://github.com/awslabs/stickler/issues/457)
+- **The report's script escaping is back to about the cost of `json.dumps`.**
+  `_json_for_script` now chains `str.replace` instead of `str.translate`, which
+  leaves CPython's ASCII fast path at the first `<`, `>` or `&`. The output is
+  byte-identical ([#457](https://github.com/awslabs/stickler/issues/457))
 
 ### Documentation
 

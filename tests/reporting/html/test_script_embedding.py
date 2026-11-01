@@ -10,6 +10,7 @@ See https://github.com/awslabs/stickler/issues/431
 """
 
 import json
+import time
 from html.parser import HTMLParser
 
 import pytest
@@ -125,3 +126,61 @@ def test_json_for_script_round_trips_and_leaves_no_markup(value):
     assert json.loads(out) == value
     for ch in "<>&\u2028\u2029":
         assert ch not in out
+
+
+# The escape table `_json_for_script` used while it went through `str.translate`.
+# `str.translate` with multi-character replacements is ~10x slower on large
+# payloads, so the helper now chains `str.replace`; the output must not change.
+_TRANSLATE_REFERENCE = str.maketrans(
+    {
+        "<": "\\u003c",
+        ">": "\\u003e",
+        "&": "\\u0026",
+        "\u2028": "\\u2028",
+        "\u2029": "\\u2029",
+    }
+)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        PAYLOAD,
+        "a < b > c & d",
+        "x\u2028y\u2029z",
+        "caf\u00e9 \u65e5\u672c \U0001f600 </script>",
+        {"k</script>": ["<!--", "-->", "&amp;", 1, 2.5, None, True]},
+        [{"reason": f"score >= {i / 10} & < {i}"} for i in range(50)],
+        "plain ascii with nothing to escape",
+        "",
+        None,
+        0,
+    ],
+)
+def test_json_for_script_output_matches_the_translate_version(value):
+    assert _json_for_script(value) == json.dumps(value).translate(_TRANSLATE_REFERENCE)
+
+
+def test_json_for_script_costs_about_as_much_as_json_dumps():
+    """A report with `<`, `>` or `&` in its reasons must not fall off the fast path (#457).
+
+    With `str.translate` this took ~10x longer than `json.dumps` on a large blob;
+    chained `str.replace` is within ~2x. The bound is loose enough for a noisy runner.
+    """
+    docs = [
+        {"doc_id": f"d{i}", "reason": f"score >= 0.{i % 10} & value < {i}", "text": "x" * 200}
+        for i in range(10000)
+    ]
+
+    def best_of(fn, runs=5):
+        best = float("inf")
+        for _ in range(runs):
+            start = time.perf_counter()
+            fn()
+            best = min(best, time.perf_counter() - start)
+        return best
+
+    plain = best_of(lambda: json.dumps(docs))
+    escaped = best_of(lambda: _json_for_script(docs))
+
+    assert escaped < plain * 6
