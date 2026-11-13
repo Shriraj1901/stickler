@@ -146,7 +146,7 @@ The `LLMComparator` sends both values to a Large Language Model and asks it to d
 1. A prompt is constructed with both values and optional evaluation guidelines using a Jinja2 template.
 2. The prompt is sent to an LLM via the `strands-agents` library and AWS Bedrock.
 3. The LLM responds with `"true"` or `"false"`.
-4. The response is mapped to 1.0 (equivalent) or 0.0 (not equivalent).
+4. The response is mapped to 1.0 (equivalent) or 0.0 (not equivalent). Only a reply that is exactly `true`, ignoring case, whitespace and surrounding punctuation, scores 1.0. Anything else scores 0.0, including `untrue`, `not true` and a longer sentence that happens to contain the word.
 
 ### Setup
 

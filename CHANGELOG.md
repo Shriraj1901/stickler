@@ -21,6 +21,13 @@ Each release links to full notes on the
 
 ### Fixed
 
+- `LLMComparator` no longer scores any reply that contains the word "true" as a
+  match ([#506](https://github.com/awslabs/stickler/issues/506)). A reply such as
+  `untrue`, `not true` or `false (it is not true)` used to score 1.0. Only a reply
+  that is exactly `true`, ignoring case, whitespace and surrounding punctuation,
+  scores 1.0 now, so a model that answers in full sentences will score lower than
+  before.
+
 - `DateComparator` now treats a naive date against a tz-aware one the same way
   in range comparisons as for single dates: the aware side's own calendar date
   is used and the naive side is read on that calendar

@@ -140,6 +140,34 @@ class TestLLMComparator:
         assert "apple" in prompt
         assert "orange" in prompt
 
+    @pytest.mark.parametrize(
+        "response",
+        ["true.", "'true'", '"True"', "**true**", "true\n", "TRUE!", "`true`"],
+    )
+    def test_compare_ignores_punctuation_around_true(self, response):
+        """Whitespace and punctuation around the one-word verdict do not matter."""
+        self._mock_agent_response(response)
+
+        assert self.comparator.compare("hello world", "hello world") == 1.0
+
+    @pytest.mark.parametrize(
+        "response",
+        [
+            "untrue",
+            "Not true",
+            "not true.",
+            "false (it is not true)",
+            "False, that is not true",
+            "The answer is true",
+            "true or false",
+        ],
+    )
+    def test_compare_requires_the_whole_reply_to_be_true(self, response):
+        """A reply that merely contains 'true' is not a match."""
+        self._mock_agent_response(response)
+
+        assert self.comparator.compare("apple", "orange") == 0.0
+
     def test_compare_with_special_values(self):
         """Test that HTML-special characters in values are escaped in the prompt."""
         self._mock_agent_response("true")

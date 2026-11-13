@@ -25,6 +25,7 @@ Example:
 """
 
 import html
+import string
 from typing import TYPE_CHECKING, Any, Dict, Union
 
 from stickler.comparators.base import BaseComparator
@@ -50,6 +51,10 @@ except ImportError:
 
     class NoCredentialsError(Exception):
         pass
+
+
+# Characters ignored around the model's one-word verdict.
+_VERDICT_STRIP = string.punctuation + string.whitespace
 
 
 class LLMComparator(BaseComparator):
@@ -231,12 +236,12 @@ class LLMComparator(BaseComparator):
         try:
             # Get LLM response
             response = self._invoke_agent(formatted_prompt)
-            # Parse response to boolean
-            response_lower = response.strip().lower()
-            if "true" in response_lower:
-                return 1.0
-            else:
-                return 0.0
+            # The prompt asks for exactly one word, so only a reply that is
+            # "true" (ignoring case, whitespace and surrounding punctuation)
+            # is a match. Matching the substring would score "untrue" or
+            # "not true" as 1.0.
+            verdict = response.strip().strip(_VERDICT_STRIP).lower()
+            return 1.0 if verdict == "true" else 0.0
 
         except NoCredentialsError:
             print("Error: AWS credentials not found.")
