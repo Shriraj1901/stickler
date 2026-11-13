@@ -323,16 +323,18 @@ result = ground_truth.compare_with(prediction, document_non_matches=True)
 
 ### Non-Match Entry Structure
 
-Each entry in the `non_matches` list contains:
+Entries come in two shapes. Scalar and nested-object fields carry a `details` dict. Items of a list field (e.g., products, line items) carry the reason at the top level and have no `details` key.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `field_path` | string | Dot-notation path to the field (e.g., `"contact.phone"`, `"products[0].name"`). |
+| `field_path` | string | Dot-notation path to the field (e.g., `"contact.phone"`, `"products[0]"`). |
 | `non_match_type` | string | One of `"false_discovery"`, `"false_alarm"`, or `"false_negative"`. |
 | `ground_truth_value` | any | The expected value (null for false alarms). |
 | `prediction_value` | any | The predicted value (null for false negatives). |
-| `similarity_score` | float | The raw similarity score between the two values. |
-| `details` | dict | Additional context, including a `"reason"` string (e.g., `"below threshold (0.300 < 1.0)"`). |
+| `similarity_score` | float | The raw similarity score between the two values. `false_discovery` entries only. |
+| `details` | dict | Scalar and nested-object fields only. Additional context, including a `"reason"` string (e.g., `"below threshold (0.300 < 1.0)"`). |
+| `reason` | string | List items only. The same kind of reason string, at the top level in place of `details`. |
+| `similarity` | float | List items only, on `false_discovery` entries. Repeats `similarity_score`. |
 
 ### Non-Match Types
 
@@ -358,13 +360,16 @@ print(f"False Negatives:   {len(false_negatives)} (missed fields)")
 
 # Inspect the worst false discoveries
 for nm in sorted(false_discoveries, key=lambda x: x['similarity_score']):
+    # The reason is under `details` for scalar and nested fields, at the top level for list items
+    reason = nm.get('details', {}).get('reason') or nm.get('reason')
     print(f"  {nm['field_path']}: "
           f"expected={nm['ground_truth_value']!r}, "
           f"got={nm['prediction_value']!r}, "
-          f"similarity={nm['similarity_score']:.3f}")
+          f"similarity={nm['similarity_score']:.3f} "
+          f"({reason})")
 ```
 
-For list fields (e.g., products, line items), non-match entries can be at the object level. The `ground_truth_value` and `prediction_value` will be dictionaries representing the full object, allowing you to inspect which specific sub-fields caused the mismatch.
+For list fields (e.g., products, line items), non-match entries can be at the object level. The `ground_truth_value` and `prediction_value` will be dictionaries representing the full object, allowing you to inspect which specific sub-fields caused the mismatch. These entries use the list-item shape from the table above: `reason` at the top level, no `details`.
 
 ---
 
